@@ -117,6 +117,28 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Helper function to check if current user is a project member (bypasses RLS)
+CREATE OR REPLACE FUNCTION public.is_project_member(check_project_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.project_members 
+    WHERE project_id = check_project_id AND user_id = auth.uid()
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Helper function to check if current user is the project creator (bypasses RLS)
+CREATE OR REPLACE FUNCTION public.is_project_admin(check_project_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.projects 
+    WHERE id = check_project_id AND created_by = auth.uid()
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- ==========================
 -- Users Policies
 -- ==========================
@@ -128,12 +150,7 @@ CREATE POLICY "Users can update themselves" ON users FOR UPDATE USING (id = auth
 -- ==========================
 -- Users can only see their projects (created by them OR they are members)
 CREATE POLICY "Users can view their projects" ON projects FOR SELECT USING (
-  created_by = auth.uid() OR
-  EXISTS (
-    SELECT 1 FROM project_members 
-    WHERE project_members.project_id = projects.id 
-    AND project_members.user_id = auth.uid()
-  )
+  created_by = auth.uid() OR public.is_project_member(id)
 );
 
 -- Admin can manage their own projects
@@ -145,22 +162,11 @@ CREATE POLICY "Admins can delete their own projects" ON projects FOR DELETE USIN
 -- Project Members Policies
 -- ==========================
 CREATE POLICY "Users can view members of their projects" ON project_members FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM projects 
-    WHERE projects.id = project_members.project_id 
-    AND (projects.created_by = auth.uid() OR 
-         EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = projects.id AND pm.user_id = auth.uid())
-    )
-  )
+  public.is_project_admin(project_id) OR public.is_project_member(project_id)
 );
 
 CREATE POLICY "Admins can manage project members for their projects" ON project_members FOR ALL USING (
-  public.is_admin() AND 
-  EXISTS (
-    SELECT 1 FROM projects 
-    WHERE projects.id = project_members.project_id 
-    AND projects.created_by = auth.uid()
-  )
+  public.is_admin() AND public.is_project_admin(project_id)
 );
 
 -- ==========================
@@ -169,16 +175,12 @@ CREATE POLICY "Admins can manage project members for their projects" ON project_
 -- Members can only see tasks assigned to them, Admins see tasks in their projects
 CREATE POLICY "Users can view tasks" ON tasks FOR SELECT USING (
   assigned_to = auth.uid() OR 
-  (public.is_admin() AND EXISTS (
-    SELECT 1 FROM projects WHERE projects.id = tasks.project_id AND projects.created_by = auth.uid()
-  ))
+  (public.is_admin() AND public.is_project_admin(project_id))
 );
 
 -- Admins can manage tasks in their projects
 CREATE POLICY "Admins can manage tasks in their projects" ON tasks FOR ALL USING (
-  public.is_admin() AND EXISTS (
-    SELECT 1 FROM projects WHERE projects.id = tasks.project_id AND projects.created_by = auth.uid()
-  )
+  public.is_admin() AND public.is_project_admin(project_id)
 );
 
 -- Members can update their assigned tasks
