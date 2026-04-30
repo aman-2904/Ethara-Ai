@@ -62,7 +62,19 @@ export default async function SignupPage(props: { searchParams: Promise<{ messag
           required
         />
         
-        <button className="bg-blue-600 hover:bg-blue-700 text-white rounded-md px-4 py-2 mb-2 transition-colors">
+        <label className="text-md" htmlFor="role">
+          Account Role
+        </label>
+        <select 
+          name="role" 
+          className="rounded-md px-4 py-2 bg-inherit border mb-6 text-sm appearance-none cursor-pointer"
+          required
+        >
+          <option value="MEMBER">Team Member</option>
+          <option value="ADMIN">Administrator</option>
+        </select>
+        
+        <button className="bg-blue-600 hover:bg-blue-700 text-white rounded-md px-4 py-2 mb-2 transition-colors font-medium">
           Sign Up
         </button>
         
