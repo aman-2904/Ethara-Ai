@@ -61,3 +61,25 @@ export async function addProjectMember(formData: FormData) {
   revalidatePath('/dashboard')
   return { success: true }
 }
+
+export async function deleteProject(projectId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user || user.user_metadata.role !== 'ADMIN') {
+    return { error: 'Unauthorized: Only ADMINs can delete projects' }
+  }
+
+  const { error } = await supabase
+    .from('projects')
+    .delete()
+    .eq('id', projectId)
+
+  if (error) {
+    console.error('Error deleting project:', error)
+    return { error: error.message }
+  }
+
+  revalidatePath('/dashboard')
+  return { success: true }
+}

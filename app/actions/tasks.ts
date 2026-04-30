@@ -15,6 +15,7 @@ export async function createTask(formData: FormData) {
   const description = formData.get('description') as string
   const projectId = formData.get('projectId') as string
   const assignedTo = formData.get('assignedTo') as string
+  const dueDate = formData.get('dueDate') as string
 
   if (!title || !projectId) return { error: 'Title and Project ID are required' }
 
@@ -24,7 +25,8 @@ export async function createTask(formData: FormData) {
       title,
       description,
       project_id: projectId,
-      assigned_to: assignedTo || null
+      assigned_to: assignedTo || null,
+      due_date: dueDate || null
     })
 
   if (error) {
